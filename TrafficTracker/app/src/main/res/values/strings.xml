@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">TrafficTracker</string>
+    <string name="app_intro_text">Enter source and destination </string>
 </resources>

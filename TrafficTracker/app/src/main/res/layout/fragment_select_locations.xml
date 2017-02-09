@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/app_intro"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:gravity="center"
+        android:padding="@dimen/spacing_small"
+        android:text="@string/app_intro_text"
+        android:textSize="@dimen/font_large" />
+
+    <EditText
+        android:id="@+id/source_address"
+        style="@style/AddressPickerTextTheme"
+        android:hint="Select Source" />
+
+    <EditText
+        android:id="@+id/destination_address"
+        style="@style/AddressPickerTextTheme"
+        android:hint="Select Destination" />
+
+    <Button
+        android:id="@+id/search_button"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/view_height_tall"
+        android:layout_gravity="center_horizontal"
+        android:text="Search" />
+
+</LinearLayout>
