@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">TrafficTracker</string>
     <string name="app_intro_text">Enter source and destination </string>
+    <string name="select_time_text">Select your departure time: </string>
 </resources>

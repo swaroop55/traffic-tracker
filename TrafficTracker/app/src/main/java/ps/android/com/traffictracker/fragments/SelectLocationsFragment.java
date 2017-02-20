@@ -9,14 +9,20 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.text.InputType;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
@@ -26,8 +32,11 @@ import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
 
-import java.util.Calendar;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
+import okhttp3.HttpUrl;
 import ps.android.com.traffictracker.R;
 import ps.android.com.traffictracker.helpers.MapsDirectionResponseHelper;
 import ps.android.com.traffictracker.network.TrafficTrackerAPI;
@@ -51,9 +60,13 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private static final String DIALOG_ERROR = "dialog_error";
 
     private static final String BEST_GUESS = "best_guess";
+    private static final String PESSIMISTIC = "pessimistic";
 
-    private static final int MILLIS_IN_A_DAY = 24 * 60 * 60 * 1000;
-    private static final int FRACTION = 12;
+    private static final long MILLIS_IN_A_MINUTE = 60 * 1000;
+    private static final long MILLIS_IN_A_DAY = 24 * 60 * 60 * 1000;
+    private static final int FRACTION_IN_MINUTES = 30;
+    private static final int MULTIPLIER_IN_ODD = 5;
+
 
     private int SOURCE_PLACE_PICKER_REQUEST = 1;
     private int DESTINATION_PLACE_PICKER_REQUEST = 2;
@@ -67,10 +80,15 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private EditText sourceEditText;
     private EditText destinationEditText;
     private Button searchButton;
+    private Spinner timeSpinner;
+    private LineChart chart;
+
 
     private Place source;
     private Place destination;
+    private int time = -1;
 
+    private List<MapsDirectionResponseHelper> durations = new ArrayList<>();
 
     public static SelectLocationsFragment newInstance() {
         return new SelectLocationsFragment();
@@ -112,7 +130,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
                 source = PlacePicker.getPlace(data, getActivity());
                 if (source != null) {
                     sourceEditText.setText(source.getAddress());
-                    locationsSelected();
+                    refreshSearchButton();
                 }
             }
         } else if (requestCode == DESTINATION_PLACE_PICKER_REQUEST) {
@@ -120,7 +138,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
                 destination = PlacePicker.getPlace(data, getActivity());
                 if (destination != null) {
                     destinationEditText.setText(destination.getAddress());
-                    locationsSelected();
+                    refreshSearchButton();
                 }
             }
         }
@@ -174,6 +192,32 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         searchButton = (Button) getView().findViewById(R.id.search_button);
         searchButton.setOnClickListener(this);
 
+        initSpinners();
+
+        chart = (LineChart) getView().findViewById(R.id.chart);
+
+
+    }
+
+    private void initSpinners() {
+        timeSpinner = (Spinner) getView().findViewById(R.id.spinner_from_time);
+        List<Integer> hours = new ArrayList<>();
+        for (int i = 0; i <= 24; i++) {
+            hours.add(i);
+        }
+        ArrayAdapter<Integer> fromAdapter = new ArrayAdapter<Integer>(getContext(), android.R.layout.simple_dropdown_item_1line, hours);
+        timeSpinner.setAdapter(fromAdapter);
+        timeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                time = (int) parent.getItemAtPosition(position);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
     }
 
     /* Creates a dialog for an error message */
@@ -221,8 +265,8 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         }
     }
 
-    private void locationsSelected() {
-        if (source != null && destination != null) {
+    private void refreshSearchButton() {
+        if (source != null && destination != null && time != -1) {
             searchButton.setEnabled(true);
         } else {
             searchButton.setEnabled(false);
@@ -230,30 +274,56 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     }
 
     private void analyseTimings() {
-        Calendar c = Calendar.getInstance();
-        long seconds = System.currentTimeMillis() + 100000l;
+        long seconds = getNextDayInMillis();
         TrafficTrackerAPI api = TrafficTrackerApiClient.getClient().create(TrafficTrackerAPI.class);
 
-        retrofit2.Call<MapsDirectionResponse> call = api.getDuration(source.getAddress().toString(), destination.getAddress().toString(), seconds, BEST_GUESS, getResources().getString(R.string.maps_api_key));
-        call.enqueue(new retrofit2.Callback<MapsDirectionResponse>() {
-            @Override
-            public void onResponse(retrofit2.Call<MapsDirectionResponse> call, retrofit2.Response<MapsDirectionResponse> response) {
-                handleResponse(response.body());
-            }
+        for (int i = 0; i < MULTIPLIER_IN_ODD; i++) {
+            int minuteMultiplier = time * 2 - (MULTIPLIER_IN_ODD / 2 - MULTIPLIER_IN_ODD + i + 1);
+            long addSecs = minuteMultiplier * FRACTION_IN_MINUTES * MILLIS_IN_A_MINUTE;
+            long reqMillis = seconds + addSecs;
+            retrofit2.Call<MapsDirectionResponse> call = api.getDuration(source.getAddress().toString(), destination.getAddress().toString(), reqMillis, PESSIMISTIC, getResources().getString(R.string.maps_api_key));
+            call.enqueue(new retrofit2.Callback<MapsDirectionResponse>() {
+                @Override
+                public void onResponse(retrofit2.Call<MapsDirectionResponse> call, retrofit2.Response<MapsDirectionResponse> response) {
+                    HttpUrl s = call.request().url();
+                    handleResponse(response.body(), s);
+                }
 
-            @Override
-            public void onFailure(retrofit2.Call<MapsDirectionResponse> call, Throwable t) {
+                @Override
+                public void onFailure(retrofit2.Call<MapsDirectionResponse> call, Throwable t) {
 
-            }
-        });
+                }
+            });
+        }
     }
 
-    private void handleResponse(MapsDirectionResponse response) {
+    private long getNextDayInMillis() {
+        long currentSeconds = System.currentTimeMillis();
+        long secsAtZeroZero = currentSeconds - (currentSeconds % MILLIS_IN_A_DAY);
+        return secsAtZeroZero + (2 * MILLIS_IN_A_DAY);
+    }
+
+    private void handleResponse(MapsDirectionResponse response, HttpUrl url) {
         MapsDirectionResponseHelper helper = new MapsDirectionResponseHelper(response);
-        /*final TextView responseView = (TextView) getView().findViewById(R.id.response);
+        durations.add(helper);
+        if (durations.size() == MULTIPLIER_IN_ODD) {
+            loadChart();
+        }
+    }
 
-        responseView.setText(helper.getDurationInTraffic());*/
-
+    private void loadChart() {
+        List<Entry> entries = new ArrayList<>();
+        Iterator<MapsDirectionResponseHelper> iterator = durations.iterator();
+        int i = 1;
+        while (iterator.hasNext()) {
+            MapsDirectionResponseHelper duration = iterator.next();
+            entries.add(new Entry(i, (duration.getDurationInTrafficInMins())));
+            i++;
+        }
+        LineDataSet dataSet = new LineDataSet(entries, "Durations");
+        LineData data = new LineData(dataSet);
+        chart.setData(data);
+        chart.invalidate();
     }
 
     /* A fragment to display an error dialog */

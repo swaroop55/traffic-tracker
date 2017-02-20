@@ -1,34 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/app_intro"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:gravity="center"
-        android:padding="@dimen/spacing_small"
-        android:text="@string/app_intro_text"
-        android:textSize="@dimen/font_large" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/source_address"
-        style="@style/AddressPickerTextTheme"
-        android:hint="Select Source" />
 
-    <EditText
-        android:id="@+id/destination_address"
-        style="@style/AddressPickerTextTheme"
-        android:hint="Select Destination" />
+        <TextView
+            android:id="@+id/app_intro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center"
+            android:padding="@dimen/spacing_small"
+            android:text="@string/app_intro_text"
+            android:textSize="@dimen/font_large" />
 
-    <Button
-        android:id="@+id/search_button"
-        android:layout_width="wrap_content"
-        android:layout_height="@dimen/view_height_tall"
-        android:layout_gravity="center_horizontal"
-        android:text="Search" />
+        <EditText
+            android:id="@+id/source_address"
+            style="@style/AddressPickerTextTheme"
+            android:hint="Select Source" />
 
-</LinearLayout>
+        <EditText
+            android:id="@+id/destination_address"
+            style="@style/AddressPickerTextTheme"
+            android:hint="Select Destination" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/text_select_time_frame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="@dimen/spacing_normal"
+                android:text="@string/select_time_text"
+                android:textSize="@dimen/font_large" />
+
+            <Spinner
+                android:id="@+id/spinner_from_time"
+                android:layout_width="@dimen/view_height_tall"
+                android:layout_height="@dimen/view_height_tall"
+                android:layout_marginRight="@dimen/spacing_normal"></Spinner>
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/search_button"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/view_height_tall"
+            android:layout_gravity="center_horizontal"
+            android:text="Search" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/chart"
+            android:layout_width="match_parent"
+            android:layout_height="300dp" />
+
+    </LinearLayout>
+</ScrollView>

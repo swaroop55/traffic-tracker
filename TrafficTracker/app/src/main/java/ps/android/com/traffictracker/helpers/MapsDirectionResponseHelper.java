@@ -8,6 +8,7 @@ import ps.android.com.traffictracker.network.response.MapsDirectionResponse;
 
 public class MapsDirectionResponseHelper {
 
+    private static int SECONDS_IN_A_MINUTE = 60;
 
     private MapsDirectionResponse.Route.Leg.Distance distance;
     private MapsDirectionResponse.Route.Leg.Duration durationInTraffic;
@@ -67,6 +68,13 @@ public class MapsDirectionResponseHelper {
     public long getDurationInTrafficInSecs() {
         if(durationInTraffic != null) {
             return durationInTraffic.getDurationInSecs();
+        }
+        return -1;
+    }
+
+    public long getDurationInTrafficInMins() {
+        if(durationInTraffic != null) {
+            return durationInTraffic.getDurationInSecs()/SECONDS_IN_A_MINUTE;
         }
         return -1;
     }
