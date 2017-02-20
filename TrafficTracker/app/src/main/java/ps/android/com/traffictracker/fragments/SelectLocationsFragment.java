@@ -5,6 +5,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.os.Bundle;
+import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
@@ -34,6 +35,8 @@ import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -90,6 +93,11 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private Place source;
     private Place destination;
     private int time = -1;
+
+    private boolean findDurationInitiated = false;
+
+    @UIMode
+    private int currentUIMode = INITIAL;
 
     private List<MapsDirectionResponseHelper> durations = new ArrayList<>();
 
@@ -198,7 +206,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         initSpinners();
 
         chart = (BarChart) getView().findViewById(R.id.chart);
-
+        adjustUI(INITIAL);
 
     }
 
@@ -261,7 +269,8 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
                 }
                 break;
             case R.id.search_button:
-                analyseTimings();
+                if (!findDurationInitiated)
+                    analyseTimings();
                 break;
             default:
                 break;
@@ -269,7 +278,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     }
 
     private void refreshSearchButton() {
-        if (source != null && destination != null && time != -1) {
+        if (source != null && destination != null && time != -1 && !findDurationInitiated) {
             searchButton.setEnabled(true);
         } else {
             searchButton.setEnabled(false);
@@ -277,6 +286,8 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     }
 
     private void analyseTimings() {
+        findDurationInitiated = true;
+        adjustUI(FETCHING);
         long seconds = getNextDayInMillis();
         TrafficTrackerAPI api = TrafficTrackerApiClient.getClient().create(TrafficTrackerAPI.class);
         durations.clear();
@@ -313,6 +324,8 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         helper.setDepartureTime(url.queryParameter("departure_time"));
         if (durations.size() == MULTIPLIER_IN_ODD) {
             loadChart();
+            findDurationInitiated = false;
+            adjustUI(FETCHED);
         }
     }
 
@@ -361,4 +374,39 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
             //(SelectLocationsFragment)getContext().onDialogDismissed();
         }
     }
+
+    /* Helper UI function to set the UI according to different modes */
+    private void adjustUI(@UIMode int mode) {
+        switch (mode) {
+            case INITIAL:
+                break;
+            case FETCHING:
+               refreshSearchButton();
+                break;
+            case FETCHED:
+                refreshSearchButton();
+                break;
+            case ERROR_FETCHING:
+                break;
+        }
+        currentUIMode = mode;
+    }
+
+    //*********************************************************************
+    // Inner Classes/Enums/Interfaces
+    //*********************************************************************
+
+    /**
+     * Annotation Interface to take care of present UI state
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({INITIAL, FETCHING, FETCHED,
+            ERROR_FETCHING})
+    private @interface UIMode {
+    }
+
+    private static final int INITIAL = 0;
+    private static final int FETCHING = 1;
+    private static final int FETCHED = 2;
+    private static final int ERROR_FETCHING = 3;
 }
