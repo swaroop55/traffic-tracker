@@ -13,6 +13,7 @@ public class MapsDirectionResponseHelper {
     private MapsDirectionResponse.Route.Leg.Distance distance;
     private MapsDirectionResponse.Route.Leg.Duration durationInTraffic;
     private MapsDirectionResponse.Route.Leg.Duration duration;
+    private String departureTime;
 
     public MapsDirectionResponseHelper(MapsDirectionResponse response) {
         understandResponse(response);
@@ -28,6 +29,14 @@ public class MapsDirectionResponseHelper {
         durationInTraffic = response.getRoutes().get(0).getLegs().get(0).getDurationInTraffic();
     }
 
+    public void setDepartureTime(String departureTime){
+        this.departureTime = departureTime;
+    }
+
+    public String getDepartureTime() {
+        return (departureTime);
+    }
+
     public String getDistanceInKms() {
         if (distance != null) {
             return distance.getDistance();
@@ -37,7 +46,7 @@ public class MapsDirectionResponseHelper {
     }
 
     public long getDistanceValue() {
-        if(distance != null) {
+        if (distance != null) {
             return distance.getDistanceValue();
         }
 
@@ -45,36 +54,36 @@ public class MapsDirectionResponseHelper {
     }
 
     public String getActualDuration() {
-        if(duration != null) {
+        if (duration != null) {
             return duration.getDuration();
         }
         return null;
     }
 
     public long getActualDurationInSecs() {
-        if(duration != null) {
+        if (duration != null) {
             return duration.getDurationInSecs();
         }
         return -1;
     }
 
     public String getDurationInTraffic() {
-        if(durationInTraffic != null) {
+        if (durationInTraffic != null) {
             return durationInTraffic.getDuration();
         }
         return null;
     }
 
     public long getDurationInTrafficInSecs() {
-        if(durationInTraffic != null) {
+        if (durationInTraffic != null) {
             return durationInTraffic.getDurationInSecs();
         }
         return -1;
     }
 
     public long getDurationInTrafficInMins() {
-        if(durationInTraffic != null) {
-            return durationInTraffic.getDurationInSecs()/SECONDS_IN_A_MINUTE;
+        if (durationInTraffic != null) {
+            return durationInTraffic.getDurationInSecs() / SECONDS_IN_A_MINUTE;
         }
         return -1;
     }

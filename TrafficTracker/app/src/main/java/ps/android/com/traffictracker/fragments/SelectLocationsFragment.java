@@ -17,12 +17,14 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
-import android.widget.TextView;
 
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.components.AxisBase;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
@@ -38,6 +40,7 @@ import java.util.List;
 
 import okhttp3.HttpUrl;
 import ps.android.com.traffictracker.R;
+import ps.android.com.traffictracker.helpers.DateTimeUtil;
 import ps.android.com.traffictracker.helpers.MapsDirectionResponseHelper;
 import ps.android.com.traffictracker.network.TrafficTrackerAPI;
 import ps.android.com.traffictracker.network.TrafficTrackerApiClient;
@@ -81,7 +84,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private EditText destinationEditText;
     private Button searchButton;
     private Spinner timeSpinner;
-    private LineChart chart;
+    private BarChart chart;
 
 
     private Place source;
@@ -194,7 +197,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
         initSpinners();
 
-        chart = (LineChart) getView().findViewById(R.id.chart);
+        chart = (BarChart) getView().findViewById(R.id.chart);
 
 
     }
@@ -276,6 +279,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private void analyseTimings() {
         long seconds = getNextDayInMillis();
         TrafficTrackerAPI api = TrafficTrackerApiClient.getClient().create(TrafficTrackerAPI.class);
+        durations.clear();
 
         for (int i = 0; i < MULTIPLIER_IN_ODD; i++) {
             int minuteMultiplier = time * 2 - (MULTIPLIER_IN_ODD / 2 - MULTIPLIER_IN_ODD + i + 1);
@@ -300,30 +304,43 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private long getNextDayInMillis() {
         long currentSeconds = System.currentTimeMillis();
         long secsAtZeroZero = currentSeconds - (currentSeconds % MILLIS_IN_A_DAY);
-        return secsAtZeroZero + (2 * MILLIS_IN_A_DAY);
+        return secsAtZeroZero + (2 * MILLIS_IN_A_DAY) - (330 * MILLIS_IN_A_MINUTE);
     }
 
     private void handleResponse(MapsDirectionResponse response, HttpUrl url) {
         MapsDirectionResponseHelper helper = new MapsDirectionResponseHelper(response);
         durations.add(helper);
+        helper.setDepartureTime(url.queryParameter("departure_time"));
         if (durations.size() == MULTIPLIER_IN_ODD) {
             loadChart();
         }
     }
 
     private void loadChart() {
-        List<Entry> entries = new ArrayList<>();
+        List<BarEntry> entries = new ArrayList<>();
         Iterator<MapsDirectionResponseHelper> iterator = durations.iterator();
-        int i = 1;
         while (iterator.hasNext()) {
             MapsDirectionResponseHelper duration = iterator.next();
-            entries.add(new Entry(i, (duration.getDurationInTrafficInMins())));
-            i++;
+            double departure = (Double.parseDouble(duration.getDepartureTime()) - getNextDayInMillis()) / MILLIS_IN_A_MINUTE;
+            entries.add(new BarEntry((float) departure, (duration.getDurationInTrafficInMins())));
         }
-        LineDataSet dataSet = new LineDataSet(entries, "Durations");
-        LineData data = new LineData(dataSet);
+
+        IAxisValueFormatter formatter = new IAxisValueFormatter() {
+            @Override
+            public String getFormattedValue(float value, AxisBase axis) {
+
+                String time = DateTimeUtil.getTimeFromMillis((long) value * MILLIS_IN_A_MINUTE);
+
+                return time;
+            }
+        };
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setValueFormatter(formatter);
+        BarDataSet dataSet = new BarDataSet(entries, "Duration in minutes");
+        BarData data = new BarData(dataSet);
         chart.setData(data);
         chart.invalidate();
+
     }
 
     /* A fragment to display an error dialog */

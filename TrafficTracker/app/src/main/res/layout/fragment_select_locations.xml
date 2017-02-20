@@ -59,10 +59,11 @@
             android:layout_gravity="center_horizontal"
             android:text="Search" />
 
-        <com.github.mikephil.charting.charts.LineChart
+        <com.github.mikephil.charting.charts.BarChart
+            android:layout_margin="@dimen/spacing_normal"
             android:id="@+id/chart"
             android:layout_width="match_parent"
-            android:layout_height="300dp" />
+            android:layout_height="250dp" />
 
     </LinearLayout>
 </ScrollView>
