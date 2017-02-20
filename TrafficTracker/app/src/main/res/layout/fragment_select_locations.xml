@@ -46,8 +46,8 @@
 
             <Spinner
                 android:id="@+id/spinner_from_time"
-                android:layout_width="@dimen/view_height_tall"
-                android:layout_height="@dimen/view_height_tall"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/view_height_taller"
                 android:layout_marginRight="@dimen/spacing_normal"></Spinner>
 
         </LinearLayout>
