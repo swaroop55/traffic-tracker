@@ -59,11 +59,22 @@
             android:layout_gravity="center_horizontal"
             android:text="Search" />
 
-        <com.github.mikephil.charting.charts.BarChart
-            android:layout_margin="@dimen/spacing_normal"
-            android:id="@+id/chart"
+        <FrameLayout
+            android:id="@+id/layout_chart"
             android:layout_width="match_parent"
-            android:layout_height="250dp" />
+            android:layout_height="250dp">
+
+            <com.github.mikephil.charting.charts.BarChart
+                android:id="@+id/chart"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_margin="@dimen/spacing_normal" />
+
+            <include layout="@layout/include_progress_circular" />
+
+
+        </FrameLayout>
+
 
     </LinearLayout>
 </ScrollView>

@@ -17,6 +17,8 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -88,6 +90,8 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private Button searchButton;
     private Spinner timeSpinner;
     private BarChart chart;
+    private FrameLayout chartLayout;
+    private ProgressBar chartProgressBar;
 
 
     private Place source;
@@ -205,7 +209,9 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
         initSpinners();
 
+        chartLayout = (FrameLayout) getView().findViewById(R.id.layout_chart);
         chart = (BarChart) getView().findViewById(R.id.chart);
+        chartProgressBar = (ProgressBar) getView().findViewById(R.id.progress_bar);
         adjustUI(INITIAL);
 
     }
@@ -379,14 +385,22 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private void adjustUI(@UIMode int mode) {
         switch (mode) {
             case INITIAL:
+                chartLayout.setVisibility(View.GONE);
                 break;
             case FETCHING:
-               refreshSearchButton();
+                chartLayout.setVisibility(View.VISIBLE);
+                chart.setVisibility(View.GONE);
+                chartProgressBar.setVisibility(View.VISIBLE);
+                refreshSearchButton();
                 break;
             case FETCHED:
+                chartLayout.setVisibility(View.VISIBLE);
+                chart.setVisibility(View.VISIBLE);
+                chartProgressBar.setVisibility(View.GONE);
                 refreshSearchButton();
                 break;
             case ERROR_FETCHING:
+                //Do something
                 break;
         }
         currentUIMode = mode;
