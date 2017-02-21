@@ -107,7 +107,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private boolean findDurationInitiated = false;
 
     private int dayOfWeek = 0; //start with 0 i.e Sunday and go till 6 i.e Saturday
-    private List<Long> departures = new ArrayList<>();
+    private List<String> departures = new ArrayList<>();
 
 
     @UIMode
@@ -356,6 +356,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
                 dayOfWeek = 0;
                 adjustUI(FETCHED);
             } else {
+                Collections.sort(durationsList.get(dayOfWeek));
                 dayOfWeek++;
                 analyseTimings();
             }
@@ -369,30 +370,21 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         IAxisValueFormatter formatter = new IAxisValueFormatter() {
             @Override
             public String getFormattedValue(float value, AxisBase axis) {
-
-                long v = departures.get((int) (value-1));
-
-                String time = DateTimeUtil.getTimeFromMillis(v * MILLIS_IN_A_MINUTE);
-
-                return time;
+                return departures.get((int) (value - 1));
             }
         };
 
         for (int i = 0; i < MULTIPLIER_IN_ODD; i++) {
-            long departure = (Long.parseLong(durationsList.get(0).get(i).getDepartureTime()) - getNextWeekInMillis()) / MILLIS_IN_A_MINUTE;
+            String departure = DateTimeUtil.getTimeFromMillis(Long.parseLong(durationsList.get(0).get(i).getDepartureTime()) - getNextWeekInMillis());
             departures.add(departure);
         }
 
-        Collections.sort(departures);
-
         for (int i = 0; i < durationsList.size(); i++) {
             List<BarEntry> entries = new ArrayList<>();
-            Collections.sort(durationsList.get(i));
             Iterator<MapsDirectionResponseHelper> iterator = durationsList.get(i).iterator();
-            int j=0;
+            int j = 0;
             while (iterator.hasNext()) {
                 MapsDirectionResponseHelper duration = iterator.next();
-                long departure = (Long.parseLong(duration.getDepartureTime()) - getNextWeekInMillis()) / MILLIS_IN_A_MINUTE;
                 entries.add(new BarEntry((float) ++j, (duration.getDurationInTrafficInMins())));
             }
             BarDataSet dataSet = new BarDataSet(entries, DateTimeUtil.dayOfWeek(i));
