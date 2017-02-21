@@ -28,6 +28,8 @@ import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.interfaces.datasets.IBarDataSet;
+import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
@@ -40,6 +42,7 @@ import com.google.android.gms.location.places.ui.PlacePicker;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -72,8 +75,12 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
     private static final long MILLIS_IN_A_MINUTE = 60 * 1000;
     private static final long MILLIS_IN_A_DAY = 24 * 60 * 60 * 1000;
+    // Interval with which duration has to be calculated
     private static final int FRACTION_IN_MINUTES = 30;
+    // No. of times the durations has to be calculated. Always keep it odd to get equal partitions before and after the time selected.
     private static final int MULTIPLIER_IN_ODD = 5;
+    private static final int DAYS_IN_WEEK_PLUS_ONE = 8;
+    private static final int DAYS_IN_WEEK = 7;
 
 
     private int SOURCE_PLACE_PICKER_REQUEST = 1;
@@ -93,17 +100,20 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private FrameLayout chartLayout;
     private ProgressBar chartProgressBar;
 
-
     private Place source;
     private Place destination;
     private int time = -1;
 
     private boolean findDurationInitiated = false;
 
+    private int dayOfWeek = 0; //start with 0 i.e Sunday and go till 6 i.e Saturday
+    private List<Long> departures = new ArrayList<>();
+
+
     @UIMode
     private int currentUIMode = INITIAL;
 
-    private List<MapsDirectionResponseHelper> durations = new ArrayList<>();
+    private List<List<MapsDirectionResponseHelper>> durationsList = new ArrayList<>();
 
     public static SelectLocationsFragment newInstance() {
         return new SelectLocationsFragment();
@@ -292,17 +302,22 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     }
 
     private void analyseTimings() {
+        if (dayOfWeek >= DAYS_IN_WEEK) {
+            return;
+        }
+        if (dayOfWeek == 0) {
+            durationsList.clear();
+        }
         findDurationInitiated = true;
         adjustUI(FETCHING);
-        long seconds = getNextDayInMillis();
+        long millis = getNextWeekInMillis() + dayOfWeek * MILLIS_IN_A_DAY;
         TrafficTrackerAPI api = TrafficTrackerApiClient.getClient().create(TrafficTrackerAPI.class);
-        durations.clear();
 
         for (int i = 0; i < MULTIPLIER_IN_ODD; i++) {
-            int minuteMultiplier = time * 2 - (MULTIPLIER_IN_ODD / 2 - MULTIPLIER_IN_ODD + i + 1);
-            long addSecs = minuteMultiplier * FRACTION_IN_MINUTES * MILLIS_IN_A_MINUTE;
-            long reqMillis = seconds + addSecs;
-            retrofit2.Call<MapsDirectionResponse> call = api.getDuration(source.getAddress().toString(), destination.getAddress().toString(), reqMillis, PESSIMISTIC, getResources().getString(R.string.maps_api_key));
+            int minuteMultiplier = time * 2 - (MULTIPLIER_IN_ODD / 2 - MULTIPLIER_IN_ODD + i + 1); // Todo: Too complex to understand. Rewrite for your own sake.
+            long addMillis = minuteMultiplier * FRACTION_IN_MINUTES * MILLIS_IN_A_MINUTE;
+            long reqMillis = millis + addMillis;
+            retrofit2.Call<MapsDirectionResponse> call = api.getDuration(source.getAddress().toString(), destination.getAddress().toString(), reqMillis, BEST_GUESS, getResources().getString(R.string.maps_api_key));
             call.enqueue(new retrofit2.Callback<MapsDirectionResponse>() {
                 @Override
                 public void onResponse(retrofit2.Call<MapsDirectionResponse> call, retrofit2.Response<MapsDirectionResponse> response) {
@@ -312,54 +327,111 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
                 @Override
                 public void onFailure(retrofit2.Call<MapsDirectionResponse> call, Throwable t) {
-
+                    adjustUI(ERROR_FETCHING);
                 }
             });
         }
     }
 
-    private long getNextDayInMillis() {
+    /*
+        Calculate millis for starting of next week i.e 12:00 AM next Sunday in IST
+     */
+    private long getNextWeekInMillis() {
         long currentSeconds = System.currentTimeMillis();
-        long secsAtZeroZero = currentSeconds - (currentSeconds % MILLIS_IN_A_DAY);
-        return secsAtZeroZero + (2 * MILLIS_IN_A_DAY) - (330 * MILLIS_IN_A_MINUTE);
+        long secsAtZeroZero = currentSeconds - (currentSeconds % MILLIS_IN_A_DAY); // Millis for 12:00 AM
+        return secsAtZeroZero + ((DAYS_IN_WEEK_PLUS_ONE - DateTimeUtil.getDayOfWeek(currentSeconds)) * MILLIS_IN_A_DAY) - (330 * MILLIS_IN_A_MINUTE); // Manually subtracted for IST
     }
 
     private void handleResponse(MapsDirectionResponse response, HttpUrl url) {
         MapsDirectionResponseHelper helper = new MapsDirectionResponseHelper(response);
-        durations.add(helper);
+        if (durationsList.size() == dayOfWeek || durationsList.get(dayOfWeek) == null) {
+            durationsList.add(dayOfWeek, new ArrayList<MapsDirectionResponseHelper>());
+        }
         helper.setDepartureTime(url.queryParameter("departure_time"));
-        if (durations.size() == MULTIPLIER_IN_ODD) {
-            loadChart();
-            findDurationInitiated = false;
-            adjustUI(FETCHED);
+        durationsList.get(dayOfWeek).add(helper);
+        if (durationsList.get(dayOfWeek).size() == MULTIPLIER_IN_ODD) {
+            if (durationsList.size() == DAYS_IN_WEEK) {
+                loadChart();
+                findDurationInitiated = false;
+                dayOfWeek = 0;
+                adjustUI(FETCHED);
+            } else {
+                dayOfWeek++;
+                analyseTimings();
+            }
         }
     }
 
     private void loadChart() {
-        List<BarEntry> entries = new ArrayList<>();
-        Iterator<MapsDirectionResponseHelper> iterator = durations.iterator();
-        while (iterator.hasNext()) {
-            MapsDirectionResponseHelper duration = iterator.next();
-            double departure = (Double.parseDouble(duration.getDepartureTime()) - getNextDayInMillis()) / MILLIS_IN_A_MINUTE;
-            entries.add(new BarEntry((float) departure, (duration.getDurationInTrafficInMins())));
-        }
+        departures.clear();
 
+        List<IBarDataSet> dataSets = new ArrayList<>();
         IAxisValueFormatter formatter = new IAxisValueFormatter() {
             @Override
             public String getFormattedValue(float value, AxisBase axis) {
 
-                String time = DateTimeUtil.getTimeFromMillis((long) value * MILLIS_IN_A_MINUTE);
+                long v = departures.get((int) (value-1));
+
+                String time = DateTimeUtil.getTimeFromMillis(v * MILLIS_IN_A_MINUTE);
 
                 return time;
             }
         };
-        XAxis xAxis = chart.getXAxis();
-        xAxis.setValueFormatter(formatter);
-        BarDataSet dataSet = new BarDataSet(entries, "Duration in minutes");
-        BarData data = new BarData(dataSet);
-        chart.setData(data);
-        chart.invalidate();
 
+        for (int i = 0; i < MULTIPLIER_IN_ODD; i++) {
+            long departure = (Long.parseLong(durationsList.get(0).get(i).getDepartureTime()) - getNextWeekInMillis()) / MILLIS_IN_A_MINUTE;
+            departures.add(departure);
+        }
+
+        Collections.sort(departures);
+
+        for (int i = 0; i < durationsList.size(); i++) {
+            List<BarEntry> entries = new ArrayList<>();
+            Collections.sort(durationsList.get(i));
+            Iterator<MapsDirectionResponseHelper> iterator = durationsList.get(i).iterator();
+            int j=0;
+            while (iterator.hasNext()) {
+                MapsDirectionResponseHelper duration = iterator.next();
+                long departure = (Long.parseLong(duration.getDepartureTime()) - getNextWeekInMillis()) / MILLIS_IN_A_MINUTE;
+                entries.add(new BarEntry((float) ++j, (duration.getDurationInTrafficInMins())));
+            }
+            BarDataSet dataSet = new BarDataSet(entries, DateTimeUtil.dayOfWeek(i));
+            switch (i) {
+                case 0:
+                    dataSet.setColor(ColorTemplate.getHoloBlue());
+                    break;
+                case 1:
+                    dataSet.setColor(ColorTemplate.rgb("ff1122"));
+                    break;
+                case 2:
+                    dataSet.setColor(ColorTemplate.rgb("ffff22"));
+                    break;
+                case 3:
+                    dataSet.setColor(ColorTemplate.rgb("001122"));
+                    break;
+                case 4:
+                    dataSet.setColor(ColorTemplate.rgb("ff1122"));
+                    break;
+                case 5:
+                    dataSet.setColor(ColorTemplate.rgb("ff11ff"));
+                    break;
+                case 6:
+                    dataSet.setColor(ColorTemplate.rgb("ff55ff"));
+                    break;
+            }
+            //dataSet.setColor(ColorTemplate.getHoloBlue());
+            dataSets.add(dataSet);
+        }
+
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setGranularity(1f);
+        xAxis.setValueFormatter(formatter);
+
+        BarData data = new BarData(dataSets);
+        data.setBarWidth(.1f);
+        chart.setData(data);
+        chart.groupBars(1f, .06f, .02f);
+        chart.invalidate();
     }
 
     /* A fragment to display an error dialog */

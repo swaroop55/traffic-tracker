@@ -6,7 +6,7 @@ import ps.android.com.traffictracker.network.response.MapsDirectionResponse;
  * Created by satyanarayana.p on 09/02/17.
  */
 
-public class MapsDirectionResponseHelper {
+public class MapsDirectionResponseHelper implements Comparable<MapsDirectionResponseHelper> {
 
     private static int SECONDS_IN_A_MINUTE = 60;
 
@@ -89,4 +89,8 @@ public class MapsDirectionResponseHelper {
     }
 
 
+    @Override
+    public int compareTo(MapsDirectionResponseHelper another) {
+        return (int)(Long.parseLong(this.getDepartureTime())-Long.parseLong(another.getDepartureTime()));
+    }
 }
