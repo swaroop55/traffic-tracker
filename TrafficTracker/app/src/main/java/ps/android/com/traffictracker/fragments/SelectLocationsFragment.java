@@ -1,13 +1,8 @@
 package ps.android.com.traffictracker.fragments;
 
-import android.app.Dialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.os.Bundle;
 import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
-import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -30,13 +25,9 @@ import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.IBarDataSet;
 import com.github.mikephil.charting.utils.ColorTemplate;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
-import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.places.Place;
-import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
 
 import java.lang.annotation.Retention;
@@ -60,15 +51,9 @@ import static android.app.Activity.RESULT_OK;
  * Created by satyanarayana.p on 06/02/17.
  */
 
-public class SelectLocationsFragment extends Fragment implements GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
+public class SelectLocationsFragment extends Fragment implements View.OnClickListener {
 
     public static String TAG = "SelectLocationsFrag";
-    // Request code to use when launching the resolution activity
-    private static final int REQUEST_RESOLVE_ERROR = 1001;
-    private static final String STATE_RESOLVING_ERROR = "resolving_error";
-
-    // Unique tag for the error dialog fragment
-    private static final String DIALOG_ERROR = "dialog_error";
 
     private static final String BEST_GUESS = "best_guess";
     private static final String PESSIMISTIC = "pessimistic";
@@ -86,11 +71,6 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     private int SOURCE_PLACE_PICKER_REQUEST = 1;
     private int DESTINATION_PLACE_PICKER_REQUEST = 2;
     private PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
-
-    // Bool to track whether the app is already resolving an error
-    private boolean mResolvingError = false;
-
-    private GoogleApiClient mGoogleApiClient;
 
     private EditText sourceEditText;
     private EditText destinationEditText;
@@ -122,10 +102,6 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mResolvingError = savedInstanceState != null
-                && savedInstanceState.getBoolean(STATE_RESOLVING_ERROR, false);
-        initGoogleApiClient();
-
     }
 
     @Override
@@ -141,16 +117,7 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_RESOLVE_ERROR) {
-            mResolvingError = false;
-            if (resultCode == RESULT_OK) {
-                // Make sure the app is not already connected or attempting to connect
-                if (!mGoogleApiClient.isConnecting() &&
-                        !mGoogleApiClient.isConnected()) {
-                    mGoogleApiClient.connect();
-                }
-            }
-        } else if (requestCode == SOURCE_PLACE_PICKER_REQUEST) {
+        if (requestCode == SOURCE_PLACE_PICKER_REQUEST) {
             if (resultCode == RESULT_OK) {
                 source = PlacePicker.getPlace(data, getActivity());
                 if (source != null) {
@@ -166,41 +133,6 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
                     refreshSearchButton();
                 }
             }
-        }
-    }
-
-    @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBoolean(STATE_RESOLVING_ERROR, mResolvingError);
-    }
-
-    private void initGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient
-                .Builder(getActivity())
-                .addApi(Places.GEO_DATA_API)
-                .addApi(Places.PLACE_DETECTION_API)
-                .enableAutoManage(getActivity(), this)
-                .build();
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult result) {
-        if (mResolvingError) {
-            // Already attempting to resolve an error.
-            return;
-        } else if (result.hasResolution()) {
-            try {
-                mResolvingError = true;
-                result.startResolutionForResult(getActivity(), REQUEST_RESOLVE_ERROR);
-            } catch (IntentSender.SendIntentException e) {
-                // There was an error with the resolution intent. Try again.
-                mGoogleApiClient.connect();
-            }
-        } else {
-            // Show dialog using GoogleApiAvailability.getErrorDialog()
-            showErrorDialog(result.getErrorCode());
-            mResolvingError = true;
         }
     }
 
@@ -245,22 +177,6 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
 
             }
         });
-    }
-
-    /* Creates a dialog for an error message */
-    private void showErrorDialog(int errorCode) {
-        // Create a fragment for the error dialog
-        ErrorDialogFragment dialogFragment = new ErrorDialogFragment();
-        // Pass the error that should be displayed
-        Bundle args = new Bundle();
-        args.putInt(DIALOG_ERROR, errorCode);
-        dialogFragment.setArguments(args);
-        dialogFragment.show(getActivity().getSupportFragmentManager(), "errordialog");
-    }
-
-    /* Called from ErrorDialogFragment when the dialog is dismissed. */
-    public void onDialogDismissed() {
-        mResolvingError = false;
     }
 
     @Override
@@ -424,25 +340,6 @@ public class SelectLocationsFragment extends Fragment implements GoogleApiClient
         chart.setData(data);
         chart.groupBars(1f, .06f, .02f);
         chart.invalidate();
-    }
-
-    /* A fragment to display an error dialog */
-    public static class ErrorDialogFragment extends DialogFragment {
-        public ErrorDialogFragment() {
-        }
-
-        @Override
-        public Dialog onCreateDialog(Bundle savedInstanceState) {
-            // Get the error code and retrieve the appropriate dialog
-            int errorCode = this.getArguments().getInt(DIALOG_ERROR);
-            return GoogleApiAvailability.getInstance().getErrorDialog(
-                    this.getActivity(), errorCode, REQUEST_RESOLVE_ERROR);
-        }
-
-        @Override
-        public void onDismiss(DialogInterface dialog) {
-            //(SelectLocationsFragment)getContext().onDialogDismissed();
-        }
     }
 
     /* Helper UI function to set the UI according to different modes */
