@@ -1,5 +1,6 @@
 package ps.android.com.traffictracker.fragments;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.IntDef;
@@ -13,11 +14,16 @@ import android.widget.EditText;
 
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
+import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.ui.PlacePicker;
+import com.google.android.gms.maps.model.LatLng;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.List;
 
 import ps.android.com.traffictracker.R;
 
@@ -27,7 +33,10 @@ import static android.app.Activity.RESULT_OK;
  * Created by satyanarayana.p on 22/02/17.
  */
 
-public class TimeTrackerFragment extends Fragment implements View.OnClickListener{
+public class TimeTrackerFragment extends Fragment implements View.OnClickListener {
+
+    private static final String GEOFENCE_REQ_ID = "My Geofence";
+    private static final float GEOFENCE_RADIUS = 200.0f; // in meters
 
     private int SOURCE_PLACE_PICKER_REQUEST = 1;
     private int DESTINATION_PLACE_PICKER_REQUEST = 2;
@@ -39,6 +48,12 @@ public class TimeTrackerFragment extends Fragment implements View.OnClickListene
 
     private Place source;
     private Place destination;
+
+    public interface GoogleAPIClientListener {
+        void addGeofence(GeofencingRequest request);
+    }
+
+    private GoogleAPIClientListener googleAPIClientListener;
 
     @UIMode
     private int currentUIMode = INITIAL;
@@ -55,6 +70,12 @@ public class TimeTrackerFragment extends Fragment implements View.OnClickListene
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_time_tracker, container, false);
+    }
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        googleAPIClientListener = (GoogleAPIClientListener) context;
     }
 
     @Override
@@ -132,8 +153,9 @@ public class TimeTrackerFragment extends Fragment implements View.OnClickListene
                 }
                 break;
             case R.id.time_tracker_search_button:
+                addGeofences();
                 //if (!findDurationInitiated)
-                  //  analyseTimings();
+                //  analyseTimings();
                 break;
             default:
                 break;
@@ -154,6 +176,35 @@ public class TimeTrackerFragment extends Fragment implements View.OnClickListene
                 break;
         }
         currentUIMode = mode;
+    }
+
+
+    private void addGeofences() {
+        List<Geofence> geoFences = new ArrayList<>();
+        geoFences.add(createGeoFence(source.getLatLng(), GEOFENCE_RADIUS));
+        geoFences.add(createGeoFence(destination.getLatLng(), GEOFENCE_RADIUS));
+
+        GeofencingRequest request = createGeofenceRequest(geoFences);
+        if (googleAPIClientListener != null) {
+            googleAPIClientListener.addGeofence(request);
+        }
+    }
+
+    private Geofence createGeoFence(LatLng latLng, float radius) {
+        return new Geofence.Builder()
+                .setRequestId(GEOFENCE_REQ_ID)
+                .setExpirationDuration(-1)
+                .setCircularRegion(latLng.latitude, latLng.longitude, radius)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER
+                        | Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build();
+    }
+
+    private GeofencingRequest createGeofenceRequest(List<Geofence> geofences) {
+        return new GeofencingRequest.Builder()
+                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+                .addGeofences(geofences)
+                .build();
     }
 
     //*********************************************************************
